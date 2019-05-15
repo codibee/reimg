@@ -21,6 +21,9 @@ var options struct {
 }
 
 func main() {
+	var originalBuf []byte
+	var newBuf []byte
+
 	flag.BoolVar(&options.version, "-version", false, "Check version")
 	flag.StringVar(&options.input, "-image", "", "Input image file")
 	flag.IntVar(&options.dstWidth, "-width", 0, "Output width dimension")
@@ -41,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	imageBuf, err := fileToBuf(options.input)
+	originalBuf, err := fileToBuf(options.input)
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Could not read image file")
@@ -58,21 +61,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	imageResized, err := Resize(imageBuf, options.dstWidth)
+	newBuf, err = Resize(originalBuf, options.dstWidth)
 
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Could not resize the image")
 		os.Exit(1)
 	}
-	convBuf, err := Convert(imageResized, bimg.PNG)
+	newBuf, err = Convert(newBuf, bimg.PNG)
 
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Could Convert image")
 	}
 
-	err = SaveImg("disk", options.output, options.input, convBuf)
+	err = SaveImg("disk", options.output, options.input, newBuf)
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Could not save the file to medium")
