@@ -192,7 +192,7 @@ func s3Add(s *session.Session, fullpath string, buf []byte) error {
 	var size int64
 	var acl string
 	size = int64(len(buf))
-	acl = "public-read"
+	acl = "private"
 
 	if os.Getenv("AWS_ACL") != "" {
 		acl = os.Getenv("AWS_ACL")
