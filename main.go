@@ -1,12 +1,13 @@
 package main
 
 import (
-	//	"errors"
 	"flag"
 	"fmt"
-	"gopkg.in/h2non/bimg.v1"
 	"log"
 	"os"
+	//"errors"
+	"github.com/joho/godotenv"
+	"gopkg.in/h2non/bimg.v1"
 	"path/filepath"
 )
 
@@ -14,24 +15,35 @@ const version = "0.0.1"
 
 var options struct {
 	version  bool
+	dstWidth int
 	input    string
 	output   string
 	format   string
-	dstWidth int
+	convert  string
+	medium   string
 }
 
 func main() {
 	var originalBuf []byte
 	var newBuf []byte
+	var err error
+
+	// we don't handle errors on purpose, the system should accept both
+	// .env file and traditional environment variables
+	godotenv.Load()
 
 	flag.BoolVar(&options.version, "-version", false, "Check version")
 	flag.StringVar(&options.input, "-image", "", "Input image file")
 	flag.IntVar(&options.dstWidth, "-width", 0, "Output width dimension")
 	flag.StringVar(&options.output, "-output", "", "Output directory")
+	flag.StringVar(&options.convert, "-convert", "", "Convert to supported type: jpeg,png, webp,tiff,gif,pdf,svg")
+	flag.StringVar(&options.medium, "-medium", "", "Choose medium: disk or s3, default is disk")
 	flag.BoolVar(&options.version, "v", false, "Check version")
 	flag.StringVar(&options.input, "i", "", "Input image file")
 	flag.IntVar(&options.dstWidth, "w", 0, "Output width dimension")
-	flag.StringVar(&options.output, "o", "", "Output path")
+	flag.StringVar(&options.output, "o", "", "Output directory")
+	flag.StringVar(&options.convert, "c", "", "Convert to supported type: jpeg,png, webp,tiff,gif,pdf,svg")
+	flag.StringVar(&options.medium, "m", "", "Choose medium: disk or s3, default is disk")
 	flag.Parse()
 
 	if options.version {
@@ -44,7 +56,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	originalBuf, err := fileToBuf(options.input)
+	originalBuf, err = fileToBuf(options.input)
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Could not read image file")
@@ -61,6 +73,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if options.medium == "" {
+		options.medium = "disk"
+	}
+
 	newBuf, err = Resize(originalBuf, options.dstWidth)
 
 	if err != nil {
@@ -68,6 +84,7 @@ func main() {
 		log.Fatal("Could not resize the image")
 		os.Exit(1)
 	}
+
 	newBuf, err = Convert(newBuf, bimg.PNG)
 
 	if err != nil {
@@ -75,10 +92,10 @@ func main() {
 		log.Fatal("Could Convert image")
 	}
 
-	err = SaveImg("disk", options.output, options.input, newBuf)
+	err = SaveImg(options.medium, options.output, options.input, newBuf)
 	if err != nil {
 		log.Fatal(err)
-		log.Fatal("Could not save the file to medium")
+		log.Fatal("Could not save the file to " + options.medium)
 	}
 
 	if len(flag.Args()) == 0 {
@@ -86,6 +103,7 @@ func main() {
 	}
 }
 
+// Reads a file into buffer
 func fileToBuf(file string) ([]byte, error) {
 	buffer, err := bimg.Read(file)
 	if err != nil {
@@ -112,17 +130,25 @@ func Convert(buf []byte, imgtype bimg.ImageType) ([]byte, error) {
 	return newBuff, nil
 }
 
+// Uploads a file to s3
+func saveTos3(fullpath string, buf []byte) error {
+	return nil
+}
+
 // Saves a bimg *Image to defined medium and path.
 func SaveImg(medium string, dstPath string, inPath string, buf []byte) error {
+	var err error
+	err = nil
 	filename, _ := getFilename(inPath)
 	typename := bimg.DetermineImageTypeName(buf)
-	fmt.Println(typename)
-
-	if medium == "disk" {
-		bimg.Write(dstPath+"/"+filename+"."+typename, buf)
-		return nil
+	fullpath := dstPath + "/" + filename + "." + typename
+	if medium == "s3" || medium == "S3" {
+		err = saveTos3(fullpath, buf)
 	}
-	return nil
+	if medium == "disk" {
+		err = bimg.Write(fullpath, buf)
+	}
+	return err
 }
 
 // Resize images based on bimg package
