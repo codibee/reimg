@@ -1,17 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/joho/godotenv"
 	"gopkg.in/h2non/bimg.v1"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 )
 
-const version = "0.0.1"
+const version = "0.2.1"
 
 var options struct {
 	version  bool
@@ -103,7 +108,7 @@ func main() {
 		log.Fatal(err)
 		log.Fatal("Could not save the file to " + options.medium)
 	}
-
+	fmt.Println("File successfully saved to " + options.medium)
 	if len(flag.Args()) == 0 {
 		os.Exit(1)
 	}
@@ -162,7 +167,47 @@ func Convert(buf []byte, imgtype bimg.ImageType) ([]byte, error) {
 
 // Uploads a file to s3
 func saveTos3(fullpath string, buf []byte) error {
-	return nil
+
+	var err error
+	err = nil
+
+	if os.Getenv("AWS_KEY") == "" || os.Getenv("AWS_SECRET") == "" ||
+		os.Getenv("AWS_BUCKET") == "" || os.Getenv("AWS_REGION") == "" {
+		return errors.New("Missing AWS credentials, please use .env file or real environment variables")
+	}
+
+	s, err := session.NewSession(&aws.Config{Region: aws.String(os.Getenv("AWS_REGION"))})
+
+	if err != nil {
+		return err
+	}
+
+	err = s3Add(s, fullpath, buf)
+
+	return err
+}
+
+// Adds object to S3 via defined aws session
+func s3Add(s *session.Session, fullpath string, buf []byte) error {
+	var size int64
+	var acl string
+	size = int64(len(buf))
+	acl = "public-read"
+
+	if os.Getenv("AWS_ACL") != "" {
+		acl = os.Getenv("AWS_ACL")
+	}
+	_, err := s3.New(s).PutObject(&s3.PutObjectInput{
+		Bucket:             aws.String(os.Getenv("AWS_BUCKET")),
+		Key:                aws.String(fullpath),
+		ACL:                aws.String(acl),
+		Body:               bytes.NewReader(buf),
+		ContentLength:      aws.Int64(size),
+		ContentType:        aws.String(http.DetectContentType(buf)),
+		ContentDisposition: aws.String("attachment"),
+	})
+
+	return err
 }
 
 // Saves a bimg *Image to defined medium and path.
