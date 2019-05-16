@@ -1,13 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"log"
-	"os"
-	//"errors"
 	"github.com/joho/godotenv"
 	"gopkg.in/h2non/bimg.v1"
+	"log"
+	"os"
 	"path/filepath"
 )
 
@@ -16,6 +16,7 @@ const version = "0.0.1"
 var options struct {
 	version  bool
 	dstWidth int
+	covtype  int
 	input    string
 	output   string
 	format   string
@@ -78,18 +79,24 @@ func main() {
 	}
 
 	newBuf, err = Resize(originalBuf, options.dstWidth)
-
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Could not resize the image")
 		os.Exit(1)
 	}
-
-	newBuf, err = Convert(newBuf, bimg.PNG)
-
-	if err != nil {
-		log.Fatal(err)
-		log.Fatal("Could Convert image")
+	if options.convert != "" 
+	{
+		convtype, err := convertTo(options.convert)
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+		newBuf, err = Convert(newBuf, convtype)
+		if err != nil {
+			log.Fatal(err)
+			log.Fatal("Could Convert image")
+			os.Exit(1)
+		}
 	}
 
 	err = SaveImg(options.medium, options.output, options.input, newBuf)
@@ -101,6 +108,30 @@ func main() {
 	if len(flag.Args()) == 0 {
 		os.Exit(1)
 	}
+}
+
+// Determines if we need image convertion or not
+func convertTo(imageType string) (bimg.ImageType, error) {
+
+	var convtype bimg.ImageType
+	var err error
+	convtype = -1
+	err = nil
+
+	if imageType == "jpg" {
+		imageType = "jpeg"
+	}
+
+	for k, v := range bimg.ImageTypes {
+		if v == imageType {
+			convtype = k
+		}
+	}
+
+	if convtype < 0 {
+		err = errors.New("Cannot convert to an unsupported type " + imageType)
+	}
+	return convtype, err
 }
 
 // Reads a file into buffer
@@ -144,9 +175,10 @@ func SaveImg(medium string, dstPath string, inPath string, buf []byte) error {
 	fullpath := dstPath + "/" + filename + "." + typename
 	if medium == "s3" || medium == "S3" {
 		err = saveTos3(fullpath, buf)
-	}
-	if medium == "disk" {
+	}else if medium == "disk" {
 		err = bimg.Write(fullpath, buf)
+	} else {
+		err = errors.New("Unsupported medium "+ medium)
 	}
 	return err
 }
