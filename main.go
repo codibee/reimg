@@ -84,8 +84,7 @@ func main() {
 		log.Fatal("Could not resize the image")
 		os.Exit(1)
 	}
-	if options.convert != "" 
-	{
+	if options.convert != "" {
 		convtype, err := convertTo(options.convert)
 		if err != nil {
 			log.Fatal(err)
@@ -175,10 +174,15 @@ func SaveImg(medium string, dstPath string, inPath string, buf []byte) error {
 	fullpath := dstPath + "/" + filename + "." + typename
 	if medium == "s3" || medium == "S3" {
 		err = saveTos3(fullpath, buf)
-	}else if medium == "disk" {
-		err = bimg.Write(fullpath, buf)
+	} else if medium == "disk" {
+		if _, err := os.Stat(dstPath); os.IsNotExist(err) {
+			os.Mkdir(dstPath, 0755)
+		}
+		if err == nil {
+			err = bimg.Write(fullpath, buf)
+		}
 	} else {
-		err = errors.New("Unsupported medium "+ medium)
+		err = errors.New("Unsupported medium " + medium)
 	}
 	return err
 }
