@@ -1,9 +1,9 @@
 clean:
-		@rm -rf dist
-		@mkdir -p dist
+	@rm -rf dist
+	@mkdir -p dist
 
 build: clean
-		GOOS=linux go build -o dist/reimg
+	GOOS=linux go build -o dist/reimg
 
 requirements:
 	go get github.com/aws/aws-sdk-go/aws
